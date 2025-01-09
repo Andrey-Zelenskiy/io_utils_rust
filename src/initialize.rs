@@ -1,8 +1,5 @@
 // Copyright Andrey Zelenskiy, 2024
-use crate::config_parse::{
-    Config, 
-    FromConfig,
-};
+use crate::config_parse::{Config, FromConfig};
 
 /* ------------------------------------ */
 /* Methods for structure initialization */
@@ -18,7 +15,7 @@ pub trait BuilderMethods: Default + FromConfig {
 
 // Trait for initializing a structure from an argument structure
 pub trait TargetFromBuilder<T>
-where 
+where
     T: BuilderMethods<Target = Self>,
 {
     // Initialize new Target from input parameters
@@ -27,11 +24,10 @@ where
     }
 
     // Initialize Target from a config file
-    fn from_config(
-        config: &Config, 
-        config_name: &str,
-        ) -> Self where Self: Sized {
-
+    fn from_config(config: &Config, config_name: &str) -> Self
+    where
+        Self: Sized,
+    {
         //Populate the parameters from the config
         let builder = T::from_config(config, config_name);
 
@@ -41,9 +37,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use serde::Deserialize;
     use super::*;
-    
+    use serde::Deserialize;
+
     pub struct TargetStruct {
         x2: u32,
         xy: u32,
@@ -83,20 +79,16 @@ mod tests {
                 }
             }
         }
-    
-    impl TargetFromBuilder<Builder> for TargetStruct {}
 
+        impl TargetFromBuilder<Builder> for TargetStruct {}
     }
-    
+
     #[test]
     fn build() {
-        let target = TargetStruct::builder()
-            .set_x(1)
-            .set_y(2)
-            .build();
+        let target = TargetStruct::builder().set_x(1).set_y(2).build();
 
-        assert_eq!(1, target.x2); 
-        assert_eq!(2, target.xy); 
-        assert_eq!(4, target.y2); 
+        assert_eq!(1, target.x2);
+        assert_eq!(2, target.xy);
+        assert_eq!(4, target.y2);
     }
 }

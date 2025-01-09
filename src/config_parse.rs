@@ -25,39 +25,45 @@ pub fn load_config(filename: &Path) -> Config {
             match extension_str {
                 "toml" => load_toml(filename),
                 "json" => load_json(filename),
-                _ => panic!("Config files with .{extension_str} extension \
-                                  are not supported."),
+                _ => panic!(
+                    "Config files with .{extension_str} extension \
+                                  are not supported."
+                ),
             }
-        },
-        None => panic!("No extension found for config file {}.", 
-                       filename.to_str().unwrap()),
+        }
+        None => panic!(
+            "No extension found for config file {}.",
+            filename.to_str().unwrap()
+        ),
     }
 }
 
 // Method to deserialize a config into the target structure
-pub trait FromConfig: for <'a> Deserialize<'a> {
+pub trait FromConfig: for<'a> Deserialize<'a> {
     fn from_config(config: &Config, table_name: &str) -> Self {
         match config {
             Config::Toml(config) => {
-                config[table_name]
-                    .clone()
-                    .try_into()
-                    .unwrap_or_else(|_| panic!(
+                config[table_name].clone().try_into().unwrap_or_else(|_| {
+                    panic!(
                         "Failed to initialize the structure for sub-table \
-                        {table_name}."))
-            },
+                        {table_name}."
+                    )
+                })
+            }
             Config::Json(config) => {
-                serde_json::from_value(config[table_name]
-                    .clone())
-                    .unwrap_or_else(|_| panic!(
-                        "Failed to initialize the structure for sub-table \
-                        {table_name}."))
-            },
+                serde_json::from_value(config[table_name].clone())
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Failed to initialize the structure for sub-table \
+                        {table_name}."
+                        )
+                    })
+            }
         }
     }
 }
 
-impl<T: for <'a> Deserialize<'a>> FromConfig for T {}
+impl<T: for<'a> Deserialize<'a>> FromConfig for T {}
 
 /* ---------------------------------------- */
 /* Method for loading data from .toml files */
@@ -66,17 +72,17 @@ impl<T: for <'a> Deserialize<'a>> FromConfig for T {}
 // Open a config.toml file and save the data as a toml::Value
 fn load_toml(filename: &Path) -> Config {
     // Read the contents of the file
-    let contents = fs::read_to_string(filename)
-        .unwrap_or_else(|_| panic!(
-                "Problem opening the file: {}", 
-                filename.to_str().unwrap()));
+    let contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+        panic!("Problem opening the file: {}", filename.to_str().unwrap())
+    });
 
     // Save the data to toml::Table
-    Config::Toml(contents
-        .parse::<toml::Table>()
-        .unwrap_or_else(|_| panic!(
-                "{} should contain a table-type data.", 
-                filename.to_str().unwrap())))
+    Config::Toml(contents.parse::<toml::Table>().unwrap_or_else(|_| {
+        panic!(
+            "{} should contain a table-type data.",
+            filename.to_str().unwrap()
+        )
+    }))
 }
 
 /* ---------------------------------------- */
@@ -86,27 +92,22 @@ fn load_toml(filename: &Path) -> Config {
 // Open a config.toml file and save the data as a toml::Value
 fn load_json(filename: &Path) -> Config {
     // Read the contents of the file
-    let contents = fs::read_to_string(filename)
-        .unwrap_or_else(|_| panic!(
-                "Problem opening the file: {}", 
-                filename.to_str().unwrap()));
+    let contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+        panic!("Problem opening the file: {}", filename.to_str().unwrap())
+    });
 
     // Save the data to toml::Table
-    Config::Json(serde_json::from_str(&contents)
-        .unwrap_or_else(|_| panic!(
-                "{} should contain a table-type data.", 
-                filename.to_str().unwrap())))
+    Config::Json(serde_json::from_str(&contents).unwrap_or_else(|_| {
+        panic!(
+            "{} should contain a table-type data.",
+            filename.to_str().unwrap()
+        )
+    }))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        Config,
-        load_config,
-        FromConfig,
-        Deserialize,
-        Path,
-    };
+    use super::{load_config, Config, Deserialize, FromConfig, Path};
 
     use std::io::Write;
 
@@ -126,7 +127,7 @@ mod tests {
     }
 
     fn rm(path: &Path) {
-        std::fs::remove_file(path).unwrap();    
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
@@ -147,7 +148,7 @@ mod tests {
 
             // Try to open the config file
             let _test_config = load_config(&path);
-            
+
             // Delete the config file
             rm(path);
         }
@@ -161,12 +162,17 @@ mod tests {
 
         #[test]
         fn sturct_from_config() {
-            let config = Config::Toml(toml::from_str(r#"
+            let config = Config::Toml(
+                toml::from_str(
+                    r#"
             [data]
             x = 1
             y = 2
             z = 3
-            "#).unwrap());
+            "#,
+                )
+                .unwrap(),
+            );
             let test_struct = TestStruct::from_config(&config, "data");
 
             assert_eq!(test_struct.x, 1);
@@ -193,7 +199,7 @@ mod tests {
 
             // Try to open the config file
             let _test_config = load_config(&path);
-            
+
             // Delete the config file
             rm(path);
         }
@@ -207,14 +213,19 @@ mod tests {
 
         #[test]
         fn sturct_from_config() {
-            let config = Config::Json(serde_json::from_str(r#"
+            let config = Config::Json(
+                serde_json::from_str(
+                    r#"
                 {
                     "data": {
                         "x": 1, 
                         "y": 2,
                         "z": 3
                     }
-                }"#).unwrap());
+                }"#,
+                )
+                .unwrap(),
+            );
             let test_struct = TestStruct::from_config(&config, "data");
 
             assert_eq!(test_struct.x, 1);
