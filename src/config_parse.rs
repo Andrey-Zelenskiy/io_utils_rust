@@ -18,6 +18,36 @@ pub enum Config {
     Json(serde_json::Value),
 }
 
+impl From<toml::Table> for Config {
+    fn from(value: toml::Table) -> Self {
+        Self::Toml(value)
+    }
+}
+
+impl From<serde_json::Value> for Config {
+    fn from(value: serde_json::Value) -> Self {
+        Self::Json(value)
+    }
+}
+
+impl Config {
+    // Initialize Config from strings
+    pub fn from_toml_str(config_str: &str) -> Self {
+        Self::from(config_str.parse::<toml::Table>().unwrap_or_else(|_| {
+            panic!("Unable to parse toml config string {config_str}")
+        }))
+    }
+
+    pub fn from_json_str(config_str: &str) -> Self {
+        Self::from(
+            serde_json::from_str::<serde_json::Value>(config_str)
+                .unwrap_or_else(|_| {
+                    panic!("Unable to parse json string {config_str}")
+                }),
+        )
+    }
+}
+
 pub fn load_config(filename: &Path) -> Config {
     match filename.extension() {
         Some(extension) => {
@@ -43,21 +73,20 @@ pub trait FromConfig: for<'a> Deserialize<'a> {
     fn from_config(config: &Config, table_name: &str) -> Self {
         match config {
             Config::Toml(config) => {
-                config[table_name].clone().try_into().unwrap_or_else(|_| {
-                    panic!(
-                        "Failed to initialize the structure for sub-table \
-                        {table_name}."
-                    )
-                })
+                match config[table_name].clone().try_into() {
+                    Ok(value) => value,
+                    Err(e) => panic!(
+                        "Failed to initialize the structure for sub-table {table_name}: {e}"
+                    ),
+                }
             }
             Config::Json(config) => {
-                serde_json::from_value(config[table_name].clone())
-                    .unwrap_or_else(|_| {
-                        panic!(
-                            "Failed to initialize the structure for sub-table \
-                        {table_name}."
-                        )
-                    })
+                match serde_json::from_value(config[table_name].clone()) {
+                    Ok(value) => value,
+                    Err(e) => panic!(
+                            "Failed to initialize the structure for sub-table {table_name}: {e}"
+                        ),
+                }
             }
         }
     }
@@ -121,6 +150,7 @@ mod tests {
     fn touch(path: &Path) {
         std::fs::OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(path)
             .unwrap();
@@ -134,7 +164,7 @@ mod tests {
     #[should_panic]
     fn wrong_extension() {
         let path = Path::new("file_with_wrong_extension.dat");
-        load_config(&path);
+        load_config(path);
     }
 
     mod toml_tests {
@@ -147,7 +177,7 @@ mod tests {
             touch(path);
 
             // Try to open the config file
-            let _test_config = load_config(&path);
+            let _test_config = load_config(path);
 
             // Delete the config file
             rm(path);
@@ -157,7 +187,7 @@ mod tests {
         #[should_panic]
         fn file_not_found() {
             let path = Path::new("this_file_doesnt_exist.toml");
-            load_config(&path);
+            load_config(path);
         }
 
         #[test]
@@ -198,7 +228,7 @@ mod tests {
             write!(file, "{contents}").unwrap();
 
             // Try to open the config file
-            let _test_config = load_config(&path);
+            let _test_config = load_config(path);
 
             // Delete the config file
             rm(path);
@@ -208,7 +238,7 @@ mod tests {
         #[should_panic]
         fn file_not_found() {
             let path = Path::new("this_file_doesnt_exist.json");
-            load_config(&path);
+            load_config(path);
         }
 
         #[test]

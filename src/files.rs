@@ -777,6 +777,6 @@ mod tests {
             },
             file,
         );
-        remove_file(&file.path()).expect("Could not delete test.dat file");
+        remove_file(file.path()).expect("Could not delete test.dat file");
     }
 }
