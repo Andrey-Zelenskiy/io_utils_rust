@@ -10,7 +10,7 @@ pub trait BuilderMethods: Default + FromConfig {
     type Target;
 
     // Initialize target structure from the parameters
-    fn build(&self) -> Self::Target;
+    fn build(&mut self) -> Self::Target;
 }
 
 // Trait for initializing a structure from an argument structure
@@ -29,7 +29,7 @@ where
         Self: Sized,
     {
         //Populate the parameters from the config
-        let builder = T::from_config(config, config_name);
+        let mut builder = T::from_config(config, config_name);
 
         builder.build()
     }
@@ -71,7 +71,7 @@ mod tests {
         impl BuilderMethods for Builder {
             type Target = TargetStruct;
 
-            fn build(&self) -> Self::Target {
+            fn build(&mut self) -> Self::Target {
                 Self::Target {
                     x2: self.x * self.x,
                     xy: self.x * self.y,
