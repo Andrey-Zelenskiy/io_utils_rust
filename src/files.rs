@@ -1,5 +1,6 @@
 // Copyright Andrey Zelenskiy, 2024-2025
 
+use std::fmt;
 use std::io::Write;
 
 use std::fs::{copy, create_dir_all, OpenOptions};
@@ -50,7 +51,7 @@ impl ProjectManager {
     }
 
     // Attempts to initialize output files depending on the overwrite
-    //  conditions
+    // conditions
     fn try_initialize_output(
         &self,
         file: &mut FileManager,
@@ -128,6 +129,33 @@ impl ProjectManager {
                 reason.kind()
             );
         }
+    }
+}
+
+impl fmt::Display for ProjectManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut summary = format!(
+            "Project path is {}\nOutput files have extension .{}\n\
+            Existing output files ",
+            self.path, self.extension
+        );
+
+        match &self.overwrite_type {
+            OverwriteType::Panic => summary.push_str(
+                "will interrupt the program (overwrite_typ = Panic).\n",
+            ),
+            OverwriteType::Archive => summary
+                .push_str("will be archived (overwrite_type = Archive).\n"),
+            OverwriteType::Overwrite => summary.push_str(
+                "will be overwritten (overwrite_type = Overwrite).\n",
+            ),
+            OverwriteType::Ignore => summary.push_str(
+                "will not be collected again during this run \
+                (overwirte_type = Ignore).\n",
+            ),
+        }
+
+        write!(f, "{summary}")
     }
 }
 
