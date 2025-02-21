@@ -14,13 +14,14 @@ pub trait BuilderMethods: Default + FromConfig {
 }
 
 // Trait for initializing a structure from an argument structure
-pub trait TargetFromBuilder<T>
-where
-    T: BuilderMethods<Target = Self>,
-{
+// pub trait TargetFromBuilder<T>
+// where
+// T: BuilderMethods<Target = Self>,
+pub trait TargetFromBuilder {
+    type Builder: BuilderMethods<Target = Self>;
     // Initialize new Target from input parameters
-    fn builder() -> T {
-        T::default()
+    fn builder() -> Self::Builder {
+        Self::Builder::default()
     }
 
     // Initialize Target from a config file
@@ -29,9 +30,7 @@ where
         Self: Sized,
     {
         //Populate the parameters from the config
-        let mut builder = T::from_config(config, config_name);
-
-        builder.build()
+        Self::Builder::from_config(config, config_name).build()
     }
 }
 
@@ -80,7 +79,9 @@ mod tests {
             }
         }
 
-        impl TargetFromBuilder<Builder> for TargetStruct {}
+        impl TargetFromBuilder for TargetStruct {
+            type Builder = Builder;
+        }
     }
 
     #[test]
