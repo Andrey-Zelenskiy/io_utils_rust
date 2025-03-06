@@ -1,7 +1,8 @@
 // Copyright Andrey Zelenskiy, 2024-2025
 
-use std::fmt;
-use std::io::Write;
+use std::{fmt, fs, io};
+
+use io::Write;
 
 use std::fs::{copy, create_dir_all, OpenOptions};
 
@@ -330,11 +331,39 @@ impl FileManager {
     }
 
     // Write methods
+
+    // Return write permission of the file manager
     pub fn writable(&self) -> bool {
         match self {
-            Self::Builder { .. } | Self::Initializer { .. } => true,
+            Self::Builder { .. } | Self::Initializer { .. } => false,
             Self::Writer { writable, .. } => *writable,
         }
+    }
+
+    // Open a file to append the data
+    pub fn open_file(&self) -> fs::File {
+        if self.writable() {
+            OpenOptions::new()
+                .append(true)
+                .open(self.path().as_path())
+                .unwrap()
+        } else {
+            panic!(
+                "{}",
+                io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    format!(
+                        "File {} does not have write permissions",
+                        self.path().to_str().unwrap()
+                    ),
+                )
+            )
+        }
+    }
+
+    // Open a file in a buffer to append the data (for larger arrays)
+    pub fn open_buffer(&self) -> io::BufWriter<fs::File> {
+        io::BufWriter::new(self.open_file())
     }
 
     // State transitions
