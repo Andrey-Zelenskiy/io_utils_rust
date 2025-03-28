@@ -230,18 +230,22 @@ impl FileManager {
         self
     }
 
-    // Change the name of the output file
+    // Set the name of the output file (only if not set)
     pub fn set_file_name(&mut self, name_str: &str) -> &mut Self {
         if let Self::Builder { name, .. } = self {
-            *name = Some(String::from(name_str));
+            if name.is_none() {
+                *name = Some(String::from(name_str));
+            }
         }
         self
     }
 
-    // Change the extension of the ouput file
+    // Set the extension of the ouput file (only if not set)
     pub fn set_extension(&mut self, extension_str: &str) -> &mut Self {
         if let Self::Builder { extension, .. } = self {
-            *extension = Some(String::from(extension_str));
+            if extension.is_none() {
+                *extension = Some(String::from(extension_str));
+            }
         }
         self
     }
