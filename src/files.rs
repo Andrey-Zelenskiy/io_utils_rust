@@ -232,9 +232,23 @@ impl FileManager {
 
     // Set the name of the output file (only if not set)
     pub fn set_file_name(&mut self, name_str: &str) -> &mut Self {
-        if let Self::Builder { name, .. } = self {
-            if name.is_none() {
-                *name = Some(String::from(name_str));
+        match self {
+            Self::Builder { name, .. } => {
+                if name.is_none() {
+                    *name = Some(String::from(name_str));
+                }
+            }
+            Self::Initializer { path, .. } => {
+                let extension =
+                    String::from(path.extension().unwrap().to_str().unwrap());
+                path.set_file_name(name_str);
+                path.set_extension(&extension);
+            }
+            Self::Writer { path, .. } => {
+                let extension =
+                    String::from(path.extension().unwrap().to_str().unwrap());
+                path.set_file_name(name_str);
+                path.set_extension(&extension);
             }
         }
         self
