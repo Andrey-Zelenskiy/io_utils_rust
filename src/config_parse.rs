@@ -12,7 +12,7 @@ use serde::Deserialize;
 /* ------------------------------ */
 /* Generic initialization methods */
 /* ------------------------------ */
-
+#[derive(Clone)]
 pub enum Config {
     Toml(toml::Table),
     Json(serde_json::Value),
