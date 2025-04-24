@@ -37,6 +37,15 @@ pub enum OverwriteType {
 }
 
 impl ProjectManager {
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    // Modify path of the project
+    pub fn set_path(&mut self, path: String) {
+        self.path = path;
+    }
+
     // Initialize output files
     pub fn initialize_output_files(
         &self,
