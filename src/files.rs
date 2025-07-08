@@ -459,13 +459,12 @@ mod tests {
         let mut test_file_3 = FileManager::default()
             .set_output_path("dir_2")
             .set_file_name("file_3")
-            .set_extension("dat")
+            .set_extension("txt")
             .build();
 
         let mut test_file_4 = FileManager::default()
             .set_output_path("dir_3")
             .set_file_name("file_4")
-            .set_extension("txt")
             .build();
 
         let files = vec![
@@ -475,7 +474,12 @@ mod tests {
             &mut test_file_4,
         ];
 
-        assert_eq!(Ok(()), project_manager.initialize_output_files(files));
+        if let Err(reason) = project_manager.initialize_output_files(files) {
+            panic!(
+                "Could not initialize output files for Overwrite test: \
+                {reason}"
+            )
+        }
 
         let files = vec![
             &mut test_file_1,
@@ -484,44 +488,65 @@ mod tests {
             &mut test_file_4,
         ];
 
-        assert_eq!(Ok(()), project_manager.initialize_output_files(files));
+        if let Err(reason) = project_manager.initialize_output_files(files) {
+            panic!(
+                "Could not initialize output files for Overwrite test: \
+                {reason}"
+            )
+        }
 
         // Verify that correct files were initialized
-        assert!(Path::new("./test_overwrite/dir_1/file_1.dat").exists());
+        assert!(
+            Path::new("./test_overwrite/dir_1/file_1.dat").exists(),
+            "file_1.dat was not created!"
+        );
 
-        assert!(Path::new("./test_overwrite/dir_1/file_2.dat").exists());
+        assert!(
+            Path::new("./test_overwrite/dir_1/file_2.csv").exists(),
+            "file_2.csv was not created!"
+        );
 
-        assert!(Path::new("./test_overwrite/dir_2/file_3.dat").exists());
+        assert!(
+            Path::new("./test_overwrite/dir_2/file_3.txt").exists(),
+            "file_3.txt was not created!"
+        );
 
-        assert!(Path::new("./test_overwrite/dir_3/file_4.dat").exists());
+        assert!(
+            Path::new("./test_overwrite/dir_3/file_4.dat").exists(),
+            "file_4.dat was not created!"
+        );
 
         // Verify final states of the FileManager
         assert_eq!(
             PathBuf::from("./test_overwrite/dir_1/file_1.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_1.path()
+            test_file_1.path(),
+            "The path of file_1.dat does not match the expected one."
         );
 
         assert_eq!(
-            PathBuf::from("./test_overwrite/dir_1/file_2.dat")
+            PathBuf::from("./test_overwrite/dir_1/file_2.csv")
                 .canonicalize()
                 .unwrap(),
-            test_file_2.path()
+            test_file_2.path(),
+            "The path of file_2.csv does not match the expected one."
         );
 
         assert_eq!(
-            PathBuf::from("./test_overwrite/dir_2/file_3.dat")
+            PathBuf::from("./test_overwrite/dir_2/file_3.txt")
                 .canonicalize()
                 .unwrap(),
-            test_file_3.path()
+            test_file_3.path(),
+            "The path of file_3.txt does not match the expected one."
         );
 
         assert_eq!(
             PathBuf::from("./test_overwrite/dir_3/file_4.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_4.path()
+            test_file_4.path(),
+            "The path of file_4.dat does not match the expected one."
         );
 
         // Delete test project directory tree
@@ -573,7 +598,12 @@ mod tests {
             &mut test_file_4,
         ];
 
-        assert_eq!(Ok(()), project_manager.initialize_output_files(files));
+        if let Err(reason) = project_manager.initialize_output_files(files) {
+            panic!(
+                "Could not initialize output files for Panic test: \
+                {reason}"
+            )
+        }
 
         let mut test_file_1_copy = FileManager::default()
             .set_header("New file_1")
@@ -624,13 +654,12 @@ mod tests {
         let mut test_file_3 = FileManager::default()
             .set_output_path("dir_2")
             .set_file_name("file_3")
-            .set_extension("dat")
+            .set_extension("txt")
             .build();
 
         let mut test_file_4 = FileManager::default()
             .set_output_path("dir_3")
             .set_file_name("file_4")
-            .set_extension("txt")
             .build();
 
         let files = vec![
@@ -640,64 +669,93 @@ mod tests {
             &mut test_file_4,
         ];
 
-        assert_eq!(Ok(()), project_manager.initialize_output_files(files));
+        if let Err(reason) = project_manager.initialize_output_files(files) {
+            panic!(
+                "Could not initialize output files for Archive test: \
+                {reason}"
+            )
+        }
 
         let mut test_file_1_copy = FileManager::default()
             .set_header("New file_1")
             .set_output_path("dir_1")
             .set_file_name("file_1")
-            .set_extension("dat")
             .build();
 
         let files = vec![&mut test_file_1_copy];
 
-        assert_eq!(Ok(()), project_manager.initialize_output_files(files));
+        if let Err(reason) = project_manager.initialize_output_files(files) {
+            panic!(
+                "Could not initialize output files for Archive test: \
+                {reason}"
+            )
+        }
 
         // Verify that correct files were initialized
-        assert!(Path::new("./test_archive/dir_1/file_1.dat").exists());
+        assert!(
+            Path::new("./test_archive/dir_1/file_1.dat").exists(),
+            "file_1.dat was not created!"
+        );
 
-        assert!(Path::new("./test_archive/dir_1/file_2.dat").exists());
+        assert!(
+            Path::new("./test_archive/dir_1/file_2.csv").exists(),
+            "file_2.csv was not created!"
+        );
 
-        assert!(Path::new("./test_archive/dir_2/file_3.dat").exists());
+        assert!(
+            Path::new("./test_archive/dir_2/file_3.txt").exists(),
+            "file_3.txt was not created!"
+        );
 
-        assert!(Path::new("./test_archive/dir_3/file_4.dat").exists());
+        assert!(
+            Path::new("./test_archive/dir_3/file_4.dat").exists(),
+            "file_4.dat was not created!"
+        );
 
-        assert!(Path::new("./test_archive/archive/dir_1/file_1.dat").exists());
+        assert!(
+            Path::new("./test_archive/archive/dir_1/file_1.dat").exists(),
+            "file_1.dat was not created!"
+        );
 
         // Verify final states of the FileManager
         assert_eq!(
             PathBuf::from("./test_archive/dir_1/file_1.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_1.path()
+            test_file_1.path(),
+            "The path of file_1.dat does not match the expected one."
         );
 
         assert_eq!(
-            PathBuf::from("./test_archive/dir_1/file_2.dat")
+            PathBuf::from("./test_archive/dir_1/file_2.csv")
                 .canonicalize()
                 .unwrap(),
-            test_file_2.path()
+            test_file_2.path(),
+            "The path of file_2.csv does not match the expected one."
         );
 
         assert_eq!(
-            PathBuf::from("./test_archive/dir_2/file_3.dat")
+            PathBuf::from("./test_archive/dir_2/file_3.txt")
                 .canonicalize()
                 .unwrap(),
-            test_file_3.path()
+            test_file_3.path(),
+            "The path of file_3.txt does not match the expected one."
         );
 
         assert_eq!(
             PathBuf::from("./test_archive/dir_3/file_4.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_4.path()
+            test_file_4.path(),
+            "The path of file_4.dat does not match the expected one."
         );
 
         assert_eq!(
             PathBuf::from("./test_archive/dir_1/file_1.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_1_copy.path()
+            test_file_1_copy.path(),
+            "The path of file_1.dat does not match the expected one."
         );
 
         // Delete test project directory tree
@@ -733,13 +791,12 @@ mod tests {
         let mut test_file_3 = FileManager::default()
             .set_output_path("dir_2")
             .set_file_name("file_3")
-            .set_extension("dat")
+            .set_extension("txt")
             .build();
 
         let mut test_file_4 = FileManager::default()
             .set_output_path("dir_3")
             .set_file_name("file_4")
-            .set_extension("txt")
             .build();
 
         let files = vec![
@@ -749,7 +806,12 @@ mod tests {
             &mut test_file_4,
         ];
 
-        assert_eq!(Ok(()), project_manager.initialize_output_files(files));
+        if let Err(reason) = project_manager.initialize_output_files(files) {
+            panic!(
+                "Could not initialize output files for Ignore test: \
+                {reason}"
+            )
+        }
 
         let mut test_file_1_copy = FileManager::default()
             .set_header("New file_1")
@@ -760,46 +822,67 @@ mod tests {
 
         let files = vec![&mut test_file_1_copy];
 
-        assert_eq!(Ok(()), project_manager.initialize_output_files(files));
+        if let Err(reason) = project_manager.initialize_output_files(files) {
+            panic!(
+                "Could not initialize output files for Ignore test: \
+                {reason}"
+            )
+        }
 
         // Verify that correct files were initialized
-        assert!(Path::new("./test_ignore/dir_1/file_1.dat").exists());
+        assert!(
+            Path::new("./test_ignore/dir_1/file_1.dat").exists(),
+            "file_1.dat was not created!"
+        );
 
-        assert!(Path::new("./test_ignore/dir_1/file_2.dat").exists());
+        assert!(
+            Path::new("./test_ignore/dir_1/file_2.csv").exists(),
+            "file_2.csv was not created!"
+        );
 
-        assert!(Path::new("./test_ignore/dir_2/file_3.dat").exists());
+        assert!(
+            Path::new("./test_ignore/dir_2/file_3.txt").exists(),
+            "file_3.txt was not created!"
+        );
 
-        assert!(Path::new("./test_ignore/dir_3/file_4.dat").exists());
+        assert!(
+            Path::new("./test_ignore/dir_3/file_4.dat").exists(),
+            "file_4.dat was not created!"
+        );
 
         // Verify final states of the FileManager
         assert_eq!(
             PathBuf::from("./test_ignore/dir_1/file_1.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_1.path()
+            test_file_1.path(),
+            "The path of file_1.dat does not match the expected one."
         );
 
         assert!(!test_file_1_copy.writable(), "{:?}", test_file_1_copy);
 
         assert_eq!(
-            PathBuf::from("./test_ignore/dir_1/file_2.dat")
+            PathBuf::from("./test_ignore/dir_1/file_2.csv")
                 .canonicalize()
                 .unwrap(),
-            test_file_2.path()
+            test_file_2.path(),
+            "The path of file_2.csv does not match the expected one."
         );
 
         assert_eq!(
-            PathBuf::from("./test_ignore/dir_2/file_3.dat")
+            PathBuf::from("./test_ignore/dir_2/file_3.txt")
                 .canonicalize()
                 .unwrap(),
-            test_file_3.path()
+            test_file_3.path(),
+            "The path of file_3.txt does not match the expected one."
         );
 
         assert_eq!(
             PathBuf::from("./test_ignore/dir_3/file_4.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_4.path()
+            test_file_4.path(),
+            "The path of file_4.dat does not match the expected one."
         );
 
         // Delete test project directory tree
