@@ -10,9 +10,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-/* ---------------------------- */
-/* Project directory parameters */
-/* ---------------------------- */
+/// Structure to setup a project directory
 #[derive(Deserialize)]
 pub struct ProjectManager {
     // Path to the project directory
@@ -37,16 +35,17 @@ pub enum OverwriteType {
 }
 
 impl ProjectManager {
+    /// Returns the path to the project directory
     pub fn path(&self) -> &str {
         &self.path
     }
 
-    // Modify path of the project
+    /// Modifies path of the project
     pub fn set_path(&mut self, path: String) {
         self.path = path;
     }
 
-    // Initialize output files
+    /// Initializes output files
     pub fn initialize_output_files(
         &self,
         files: Vec<&mut FileManager>,
@@ -56,12 +55,13 @@ impl ProjectManager {
             .map(|file| {
                 file.set_project_path(&self.path)
                     .set_extension(&self.extension)
+                    .set_path()
             })
             .try_for_each(|file| self.try_initialize_output(file))
     }
 
-    // Attempts to initialize output files depending on the overwrite
-    // conditions
+    /// Attempts to initialize output files depending on the overwrite
+    /// conditions
     fn try_initialize_output(
         &self,
         file: &mut FileManager,
@@ -86,12 +86,11 @@ impl ProjectManager {
                         if let Err(reason) = create_dir_all(&archive_path) {
                             panic!(
                                 "Unable to create archive directory {:?}: {:?}",
-                                archive_path,
-                                reason.kind()
+                                archive_path, reason
                             );
                         }
                     }
-                    self.move_to_archive(&file.path(), &archive_path);
+                    self.move_to_archive(file.path(), &archive_path);
                 }
 
                 file.initialize_output();
@@ -103,7 +102,7 @@ impl ProjectManager {
             }
             OverwriteType::Ignore => {
                 if file.path().exists() {
-                    file.to_writer(false);
+                    file.change_write_permission(false);
                 } else {
                     file.initialize_output();
                 }
@@ -112,10 +111,29 @@ impl ProjectManager {
         }
     }
 
-    // Move file to archive
+    /// Moves a file to archive
     fn move_to_archive(&self, file_path: &Path, archive_path: &Path) {
-        let filename = file_path.file_name().unwrap();
-        let relative_path = file_path.parent().unwrap().file_name().unwrap();
+        let filename = match file_path.file_name() {
+            None => panic!(
+                "Cannot move file to archive, no file name in path {:?}",
+                file_path
+            ),
+            Some(name) => name,
+        };
+
+        let relative_path = match file_path.parent() {
+            None => panic!(
+                "Cannot move file to archive, no parent directory in path {:?}",
+                file_path
+            ),
+            Some(full_path) => match full_path.file_name() {
+                None => panic!(
+                "Cannot move file to archive, no output directory in path {:?}",
+                file_path
+            ),
+                Some(path) => path,
+            },
+        };
 
         if !archive_path.join(relative_path).exists() {
             if let Err(reason) =
@@ -124,7 +142,7 @@ impl ProjectManager {
                 panic!(
                     "Cannot create {:?} directory: {:?}",
                     archive_path.join(relative_path),
-                    reason.kind()
+                    reason
                 );
             }
         }
@@ -136,7 +154,7 @@ impl ProjectManager {
                 "Cannot move file {:?} to {:?}: {:?}",
                 file_path,
                 archive_path.join(relative_path).join(filename),
-                reason.kind()
+                reason
             );
         }
     }
@@ -169,269 +187,341 @@ impl fmt::Display for ProjectManager {
     }
 }
 
-/* ---------------------- */
-/* Output file parameters */
-/* ---------------------- */
-
-// Type for output file manipulation
-#[derive(Clone, Debug, PartialEq)]
-pub enum FileManager {
-    Builder {
-        // Column descriptions in the output file
-        header: Option<String>,
-        // Project path
-        project_path: Option<String>,
-        // Output path (relative to the project path)
-        output_path: Option<String>,
-        // File name
-        name: Option<String>,
-        // File extension
-        extension: Option<String>,
-    },
-    Initializer {
-        header: Option<String>,
-        // Absolute path to the output file
-        path: PathBuf,
-    },
-    Writer {
-        path: PathBuf,
-        // Permission for writting to the file
-        writable: bool,
-    },
-}
-
-impl Default for FileManager {
-    fn default() -> Self {
-        Self::Builder {
-            header: None,
-            project_path: None,
-            output_path: None,
-            name: None,
-            extension: None,
-        }
-    }
+/// Type for output file manipulation
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FileManager {
+    // Column descriptions in the output file
+    header: Option<String>,
+    // Project path
+    project_path: Option<String>,
+    // Output path (relative to the project path)
+    output_path: Option<String>,
+    // File name
+    name: Option<String>,
+    // File extension
+    extension: Option<String>,
+    // Option for a series of data files with related name/structure,
+    // stores number of files and current file index
+    series: Option<(u32, usize)>,
+    // Absolute path of the output file
+    path: Option<PathBuf>,
+    // Permission for writing to the file
+    writable: bool,
 }
 
 impl FileManager {
     // Builder methods
 
-    // Set the header
-    pub fn set_header(&mut self, header_str: &str) -> &mut Self {
-        if let Self::Builder { header, .. } = self {
-            *header = Some(String::from(header_str));
+    /// Return the initialization state
+    pub fn initialized(&self) -> bool {
+        self.path.is_some()
+    }
+
+    // Setters
+    // Note: the setters only work when self.initialized() = false, and
+    // the specified field has not been set yet.For all other cases,
+    // one must use Modifiers
+
+    /// Sets the header
+    pub fn set_header(&mut self, header: &str) -> &mut Self {
+        if !self.initialized() && self.header.is_none() {
+            self.header = Some(header.to_string());
         }
         self
     }
 
-    // Add a path to the root project directory
-    pub fn set_project_path(&mut self, project_path_str: &str) -> &mut Self {
-        if let Self::Builder { project_path, .. } = self {
-            *project_path = Some(String::from(project_path_str));
+    /// Adds a path to the root project directory
+    pub fn set_project_path(&mut self, project_path: &str) -> &mut Self {
+        if !self.initialized() && self.project_path.is_none() {
+            self.project_path = Some(project_path.to_string());
         }
         self
     }
 
-    // Set the output directory path (relative to the project directory)
-    pub fn set_output_path(&mut self, output_path_str: &str) -> &mut Self {
-        if let Self::Builder { output_path, .. } = self {
-            *output_path = Some(String::from(output_path_str));
+    /// Sets the output directory path (relative to the project directory)
+    pub fn set_output_path(&mut self, output_path: &str) -> &mut Self {
+        if !self.initialized() && self.output_path.is_none() {
+            self.output_path = Some(output_path.to_string());
         }
         self
     }
 
-    // Set the name of the output file (only if not set)
-    pub fn set_file_name(&mut self, name_str: &str) -> &mut Self {
-        match self {
-            Self::Builder { name, .. } => {
-                if name.is_none() {
-                    *name = Some(String::from(name_str));
-                }
-            }
-            Self::Initializer { path, .. } => {
-                let extension =
-                    String::from(path.extension().unwrap().to_str().unwrap());
-                path.set_file_name(name_str);
-                path.set_extension(&extension);
-            }
-            Self::Writer { path, .. } => {
-                let extension =
-                    String::from(path.extension().unwrap().to_str().unwrap());
-                path.set_file_name(name_str);
-                path.set_extension(&extension);
-            }
+    /// Sets the name of the output file
+    pub fn set_file_name(&mut self, name: &str) -> &mut Self {
+        if !self.initialized() && self.name.is_none() {
+            self.name = Some(name.to_string());
         }
         self
     }
 
-    // Set the extension of the ouput file (only if not set)
-    pub fn set_extension(&mut self, extension_str: &str) -> &mut Self {
-        if let Self::Builder { extension, .. } = self {
-            if extension.is_none() {
-                *extension = Some(String::from(extension_str));
-            }
+    /// Sets the extension of the ouput file
+    pub fn set_extension(&mut self, extension: &str) -> &mut Self {
+        if !self.initialized() && self.extension.is_none() {
+            self.extension = Some(extension.to_string());
         }
         self
     }
 
-    // Obtain the path to the output file
-    pub fn path(&self) -> PathBuf {
-        match self {
-            Self::Builder {
-                project_path,
-                output_path,
-                name,
-                extension,
-                ..
-            } => {
+    /// Sets the number of files in series
+    pub fn set_series(&mut self, n_files: u32) -> &mut Self {
+        if !self.initialized() && self.series.is_none() {
+            self.series = Some((n_files, 0));
+        }
+        self
+    }
+
+    /// Attempts to set the path to the file
+    fn set_path(&mut self) -> &mut Self {
+        self.path = self.calculate_path();
+        self
+    }
+
+    /// Attempts to calculate the path to the file
+    fn calculate_path(&mut self) -> Option<PathBuf> {
+        // To initialize the path, self.project_path, self.output_path,
+        // self.name, and self.extension must be set
+        match (
+            &self.project_path,
+            &self.output_path,
+            &self.name,
+            &self.extension,
+        ) {
+            (
+                Some(project_path),
+                Some(output_path),
+                Some(name),
+                Some(extension),
+            ) => {
                 let mut path = PathBuf::new();
 
-                if let Some(s) = project_path {
-                    path.push(s);
-                }
+                path.push(project_path);
 
-                if let Some(s) = output_path {
-                    path.push(s);
-                }
+                path.push(output_path);
 
-                match name {
-                    Some(s) => path.push(s),
-                    None => path.push("file"),
-                }
-
-                let _ = match extension {
-                    Some(s) => path.set_extension(s),
-                    None => path.set_extension("dat"),
+                // If dealing with file series, add the index of the file
+                let file_name = match &self.series {
+                    Some((_, index)) => &format!("{name}_{index}"),
+                    None => name,
                 };
 
-                path
+                path.push(file_name);
+
+                path.set_extension(extension);
+
+                // Attempt to canonicalize the path
+                match path.canonicalize() {
+                    Ok(absolute_path) => Some(absolute_path),
+                    Err(_) => Some(path),
+                }
             }
-            Self::Initializer { path, .. } => PathBuf::from(path),
-            Self::Writer { path, .. } => PathBuf::from(path),
+            _ => None,
+        }
+    }
+
+    /// Call to build the path
+    pub fn build(&mut self) -> Self {
+        self.set_path().clone()
+    }
+
+    // Modifiers
+    // Note: the setters only work when self.initialized() = true.
+    // Otherwise, one must use Setters
+
+    /// Changeis the path to the root project directory
+    pub fn change_project_path(&mut self, project_path: &str) {
+        if self.initialized() {
+            self.project_path = Some(project_path.to_string());
+            self.set_path();
+        }
+    }
+
+    /// Changes the output directory path (relative to the project directory)
+    pub fn change_output_path(&mut self, output_path: &str) {
+        if self.initialized() {
+            self.output_path = Some(output_path.to_string());
+            self.set_path();
+        }
+    }
+
+    /// Changes the name of the output file
+    pub fn change_file_name(&mut self, name: &str) {
+        if self.initialized() {
+            self.name = Some(name.to_string());
+            self.set_path();
+        }
+    }
+
+    /// Change the extension of the ouput file - use cautiously!
+    pub fn change_extension(&mut self, extension: &str) {
+        if self.initialized() {
+            self.extension = Some(extension.to_string());
+            self.set_path();
+        }
+    }
+
+    /// Changes the file index if dealing with file series
+    pub fn change_file_index(&mut self, index: usize) {
+        if self.initialized() {
+            if let Some((n_files, _)) = self.series {
+                self.series = Some((n_files, index));
+                self.set_path();
+            }
+        }
+    }
+
+    /// Changes write permissions
+    pub fn change_write_permission(&mut self, writable: bool) {
+        self.writable = writable;
+    }
+
+    /// Returns the path to the output file
+    pub fn path(&self) -> &PathBuf {
+        match &self.path {
+            Some(path) => path,
+            None => panic!(
+                "Attempting to access the path of uninitialized FileManager\n\
+                Curently,\nproject_path: {:?},\noutput_path: {:?},\
+                \nname: {:?},\nextension: {:?},\n",
+                self.project_path, self.output_path, self.name, self.extension
+            ),
+        }
+    }
+
+    /// Returns the path to the output file as a string
+    pub fn path_string(&self) -> String {
+        match self.path().to_str() {
+            Some(path_str) => path_str.to_string(),
+            None => panic!(
+                "Could not convert file path {:?} to string",
+                self.path()
+            ),
         }
     }
 
     // Initializer methods
 
-    // Create the output file
+    /// Creates the output file (or files if dealing with series)
     pub fn initialize_output(&mut self) {
-        self.to_initializer();
+        // Make sure that the path is initialized
+        if !self.initialized() {
+            self.set_path();
+        }
 
-        if let Self::Initializer { header, path } = self {
-            // Create output directory
-            if !path.parent().unwrap().exists() {
-                if let Err(reason) = create_dir_all(path.parent().unwrap()) {
-                    panic!(
-                        "Cannot initialize output directory: {:?}",
-                        reason.kind(),
-                    );
+        // Create output directory
+        match self.path().parent() {
+            None => panic!(
+                "No parent directory found for {:?} FileManager",
+                self.path()
+            ),
+            Some(path) => {
+                if !path.exists() {
+                    if let Err(reason) = create_dir_all(path) {
+                        panic!(
+                            "Cannot initialize output directory {:?}: {:?}",
+                            path, reason,
+                        );
+                    }
                 }
             }
+        }
 
-            match OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(path.as_path())
-            {
-                Ok(mut file) => match header {
-                    Some(header_str) => {
-                        if let Err(reason) = writeln!(file, "{header_str}") {
-                            panic!(
-                                "Could not write to file {:?}: {:?}",
-                                path,
-                                reason.kind()
-                            );
-                        }
-                    }
-                    None => (),
-                },
-                Err(reason) => panic!(
-                    "Could not open file {:?}: {:?}",
-                    path,
-                    reason.kind()
-                ),
+        // Initialize file(s)
+        match &self.series {
+            None => Self::initialize_file(self.path().as_path(), &self.header),
+            Some((n_files, _)) => {
+                for i in 0..*n_files as usize {
+                    self.change_file_index(i);
+                    self.set_path();
+
+                    Self::initialize_file(self.path().as_path(), &self.header)
+                }
             }
+        }
 
-            // Convert to Writer with write permissions
-            self.to_writer(true);
+        // Change the writing permissions
+        self.writable = true;
+
+        // Attempt to canonicalize the path
+        match self.path().canonicalize() {
+            Ok(absolute_path) => self.path = Some(absolute_path),
+            Err(reason) => {
+                println!(
+                    "Could not canonicalize path {:?}, using relative \
+                        form: {:?}",
+                    self.path(),
+                    reason.kind()
+                );
+            }
+        }
+    }
+
+    /// Helper method for initializing a single (new) file
+    fn initialize_file(path: &Path, header: &Option<String>) {
+        match OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(path)
+        {
+            // Write the header
+            Ok(mut file) => match header {
+                Some(header_str) => {
+                    if let Err(reason) = writeln!(file, "{header_str}") {
+                        panic!(
+                            "Could not write to file {:?}: {:?}",
+                            path, reason
+                        );
+                    }
+                }
+                None => (),
+            },
+            Err(reason) => {
+                panic!("Could not open file {:?}: {:?}", path, reason)
+            }
         }
     }
 
     // Write methods
 
-    // Return write permission of the file manager
+    /// Returns write permission of the file manager
     pub fn writable(&self) -> bool {
-        match self {
-            Self::Builder { .. } | Self::Initializer { .. } => false,
-            Self::Writer { writable, .. } => *writable,
-        }
+        self.writable
     }
 
-    // Open a file to append the data
+    /// Opens a file to append the data
     pub fn open_file(&self) -> fs::File {
         if self.writable() {
-            OpenOptions::new()
-                .append(true)
-                .open(self.path().as_path())
-                .unwrap()
+            match OpenOptions::new().append(true).open(self.path().as_path()) {
+                Ok(file) => file,
+                Err(reason) => panic!(
+                    "Could not open file {:?}: {:?}",
+                    self.path(),
+                    reason
+                ),
+            }
         } else {
             panic!(
                 "{}",
                 io::Error::new(
                     io::ErrorKind::PermissionDenied,
                     format!(
-                        "File {} does not have write permissions",
-                        self.path().to_str().unwrap()
+                        "File {:?} does not have write permissions",
+                        self.path()
                     ),
                 )
             )
         }
     }
 
-    // Open a file in a buffer to append the data (for larger arrays)
+    /// Opens a file in a buffer to append the data (for larger arrays)
     pub fn open_buffer(&self) -> io::BufWriter<fs::File> {
         io::BufWriter::new(self.open_file())
-    }
-
-    // State transitions
-
-    // Function that can be used to return the current state of the object
-    pub fn build(&mut self) -> Self {
-        self.clone()
-    }
-
-    // If the current state is Builder change it to Initializer
-    pub fn to_initializer(&mut self) {
-        if let Self::Builder { header, .. } = self {
-            *self = Self::Initializer {
-                header: header.clone(),
-                path: self.path(),
-            }
-        }
-    }
-
-    // If the current state is Builder or Initializer, change it to Writer
-    pub fn to_writer(&mut self, writable: bool) {
-        match self {
-            Self::Builder { .. } | Self::Initializer { .. } => {
-                // Attempt to create an absolute path for the output
-                let mut path = self.path();
-
-                path = match path.canonicalize() {
-                    Ok(absolute_path) => absolute_path,
-                    Err(_) => path,
-                };
-
-                *self = Self::Writer { path, writable }
-            }
-            Self::Writer { .. } => (),
-        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{remove_dir_all, remove_file};
+    use std::fs::remove_dir_all;
 
     use super::*;
 
@@ -521,7 +611,7 @@ mod tests {
             PathBuf::from("./test_overwrite/dir_1/file_1.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_1.path(),
+            *test_file_1.path(),
             "The path of file_1.dat does not match the expected one."
         );
 
@@ -529,7 +619,7 @@ mod tests {
             PathBuf::from("./test_overwrite/dir_1/file_2.csv")
                 .canonicalize()
                 .unwrap(),
-            test_file_2.path(),
+            *test_file_2.path(),
             "The path of file_2.csv does not match the expected one."
         );
 
@@ -537,7 +627,7 @@ mod tests {
             PathBuf::from("./test_overwrite/dir_2/file_3.txt")
                 .canonicalize()
                 .unwrap(),
-            test_file_3.path(),
+            *test_file_3.path(),
             "The path of file_3.txt does not match the expected one."
         );
 
@@ -545,7 +635,7 @@ mod tests {
             PathBuf::from("./test_overwrite/dir_3/file_4.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_4.path(),
+            *test_file_4.path(),
             "The path of file_4.dat does not match the expected one."
         );
 
@@ -553,7 +643,7 @@ mod tests {
         if let Err(reason) = remove_dir_all("./test_overwrite/") {
             panic!(
                 "Cannot remove project directory ./test_overwrite/: {:?}",
-                reason.kind()
+                reason
             );
         }
     }
@@ -625,7 +715,7 @@ mod tests {
         if let Err(reason) = remove_dir_all("./test_panic/") {
             panic!(
                 "Cannot remove project directory ./test_panic/: {:?}",
-                reason.kind()
+                reason
             );
         }
     }
@@ -722,7 +812,7 @@ mod tests {
             PathBuf::from("./test_archive/dir_1/file_1.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_1.path(),
+            *test_file_1.path(),
             "The path of file_1.dat does not match the expected one."
         );
 
@@ -730,7 +820,7 @@ mod tests {
             PathBuf::from("./test_archive/dir_1/file_2.csv")
                 .canonicalize()
                 .unwrap(),
-            test_file_2.path(),
+            *test_file_2.path(),
             "The path of file_2.csv does not match the expected one."
         );
 
@@ -738,7 +828,7 @@ mod tests {
             PathBuf::from("./test_archive/dir_2/file_3.txt")
                 .canonicalize()
                 .unwrap(),
-            test_file_3.path(),
+            *test_file_3.path(),
             "The path of file_3.txt does not match the expected one."
         );
 
@@ -746,7 +836,7 @@ mod tests {
             PathBuf::from("./test_archive/dir_3/file_4.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_4.path(),
+            *test_file_4.path(),
             "The path of file_4.dat does not match the expected one."
         );
 
@@ -754,7 +844,7 @@ mod tests {
             PathBuf::from("./test_archive/dir_1/file_1.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_1_copy.path(),
+            *test_file_1_copy.path(),
             "The path of file_1.dat does not match the expected one."
         );
 
@@ -762,7 +852,7 @@ mod tests {
         if let Err(reason) = remove_dir_all("./test_archive/") {
             panic!(
                 "Cannot remove project directory ./test_archive/: {:?}",
-                reason.kind()
+                reason
             );
         }
     }
@@ -855,7 +945,7 @@ mod tests {
             PathBuf::from("./test_ignore/dir_1/file_1.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_1.path(),
+            *test_file_1.path(),
             "The path of file_1.dat does not match the expected one."
         );
 
@@ -865,7 +955,7 @@ mod tests {
             PathBuf::from("./test_ignore/dir_1/file_2.csv")
                 .canonicalize()
                 .unwrap(),
-            test_file_2.path(),
+            *test_file_2.path(),
             "The path of file_2.csv does not match the expected one."
         );
 
@@ -873,7 +963,7 @@ mod tests {
             PathBuf::from("./test_ignore/dir_2/file_3.txt")
                 .canonicalize()
                 .unwrap(),
-            test_file_3.path(),
+            *test_file_3.path(),
             "The path of file_3.txt does not match the expected one."
         );
 
@@ -881,7 +971,7 @@ mod tests {
             PathBuf::from("./test_ignore/dir_3/file_4.dat")
                 .canonicalize()
                 .unwrap(),
-            test_file_4.path(),
+            *test_file_4.path(),
             "The path of file_4.dat does not match the expected one."
         );
 
@@ -889,7 +979,7 @@ mod tests {
         if let Err(reason) = remove_dir_all("./test_ignore/") {
             panic!(
                 "Cannot remove project directory ./test_ignore/: {:?}",
-                reason.kind()
+                reason
             );
         }
     }
@@ -905,45 +995,59 @@ mod tests {
             .build();
 
         assert_eq!(
-            FileManager::Builder {
+            FileManager {
                 header: Some(String::from("Some header")),
                 project_path: Some(String::from(".")),
                 output_path: Some(String::from("test")),
                 name: Some(String::from("test")),
                 extension: Some(String::from("dat")),
+                series: None,
+                path: Some(PathBuf::from("./test/test.dat")),
+                writable: false
             },
             file
         );
     }
 
     #[test]
-    fn initialize_file() {
-        let mut file = FileManager::default()
-            .set_header("Some header")
-            .set_project_path(".")
-            .set_file_name("test")
+    fn file_series() {
+        // Setup test project directory tree
+        let project_manager = ProjectManager {
+            path: "test_series".to_owned(),
+            extension: "dat".to_owned(),
+            overwrite_type: OverwriteType::Overwrite,
+        };
+
+        let mut test_file = FileManager::default()
+            .set_output_path("dir")
+            .set_file_name("file")
             .set_extension("dat")
+            .set_series(10)
             .build();
 
-        file.to_initializer();
+        if let Err(reason) =
+            project_manager.initialize_output_files(vec![&mut test_file])
+        {
+            panic!(
+                "Could not initialize output files for file series test: \
+                {reason}"
+            )
+        }
 
-        assert_eq!(
-            FileManager::Initializer {
-                header: Some("Some header".to_owned()),
-                path: PathBuf::from("./test.dat"),
-            },
-            file,
-        );
+        for i in 0..10 {
+            // Verify that correct files were initialized
+            assert!(
+                Path::new(&format!("./test_series/dir/file_{i}.dat")).exists(),
+                "file_{i}.dat was not created!"
+            );
+        }
 
-        file.initialize_output();
-
-        assert_eq!(
-            FileManager::Writer {
-                path: PathBuf::from("./test.dat").canonicalize().unwrap(),
-                writable: true,
-            },
-            file,
-        );
-        remove_file(file.path()).expect("Could not delete test.dat file");
+        // Delete test project directory tree
+        if let Err(reason) = remove_dir_all("./test_series/") {
+            panic!(
+                "Cannot remove project directory ./test_series/: {:?}",
+                reason
+            );
+        }
     }
 }
