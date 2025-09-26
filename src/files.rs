@@ -8,7 +8,7 @@ use std::fs::{copy, create_dir_all, OpenOptions};
 
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Structure to setup a project directory
 #[derive(Deserialize)]
@@ -188,7 +188,7 @@ impl fmt::Display for ProjectManager {
 }
 
 /// Type for output file manipulation
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct FileManager {
     // Column descriptions in the output file
     header: Option<String>,
@@ -204,8 +204,10 @@ pub struct FileManager {
     // stores number of files and current file index
     series: Option<(u32, usize)>,
     // Absolute path of the output file
+    #[serde(skip)]
     path: Option<PathBuf>,
     // Permission for writing to the file
+    #[serde(skip)]
     writable: bool,
 }
 
